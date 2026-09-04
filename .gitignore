@@ -27,3 +27,6 @@ build/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+
+# Notas locales, no publicas (estado de tramites externos, credenciales pendientes, etc.)
+SIGNPATH_SETUP.md
