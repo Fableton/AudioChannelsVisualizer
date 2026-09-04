@@ -1,0 +1,29 @@
+# Visual Studio / MSBuild
+.vs/
+x64/
+x86/
+Win32/
+Debug/
+Release/
+*.obj
+*.ilk
+*.pdb
+*.idb
+*.ipch
+*.tlog
+*.log
+*.exp
+*.lib
+*.iobj
+*.ipdb
+*.VC.db
+*.VC.VC.opendb
+*.sln.docstates
+*.user
+*.suo
+
+# CMake (por si se migra el build)
+build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
