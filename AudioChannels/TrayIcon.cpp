@@ -1,4 +1,5 @@
 #include "TrayIcon.h"
+#include "Localization.h"
 
 TrayIcon::TrayIcon(HWND hwnd, UINT callbackMessage)
     : hwnd_(hwnd), callbackMessage_(callbackMessage) {
@@ -54,7 +55,7 @@ void TrayIcon::Update(const std::vector<AudioEngine::ChannelSnapshot>& channels,
     if (!deviceName.empty()) {
         tooltip += L" - " + deviceName;
         if (!channels.empty()) {
-            tooltip += L" (" + std::to_wstring(channels.size()) + L" canales)";
+            tooltip += L" (" + Loc::ChannelCountLabel(channels.size()) + L")";
         }
     }
     wcsncpy_s(nid_.szTip, tooltip.c_str(), _TRUNCATE);

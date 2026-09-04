@@ -12,4 +12,8 @@ void SetSelectedDeviceId(const std::wstring& deviceId);
 bool IsAutoStartEnabled();
 void SetAutoStartEnabled(bool enabled);
 
+// "" = automatico (segun el idioma de Windows), "es" o "en" para forzarlo.
+std::wstring GetLanguageOverride();
+void SetLanguageOverride(const std::wstring& languageCode);
+
 } // namespace AppSettings

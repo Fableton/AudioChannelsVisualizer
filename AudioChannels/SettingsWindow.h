@@ -1,6 +1,7 @@
 #pragma once
 #include "framework.h"
 #include "DeviceManager.h"
+#include "Localization.h"
 
 // Ventana de configuracion: elegir el dispositivo de salida a monitorear
 // (o "predeterminado") y habilitar/deshabilitar el autoarranque con
@@ -29,6 +30,8 @@ private:
     LRESULT HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     void CreateControls(HWND hwnd);
     void PopulateDeviceList();
+    void PopulateLanguageList();
+    void ApplyLocalizedText();
     void OnOk();
     void RecreateFont();
     void Layout();
@@ -40,6 +43,8 @@ private:
 
     HWND deviceLabel_ = nullptr;
     HWND deviceCombo_ = nullptr;
+    HWND languageLabel_ = nullptr;
+    HWND languageCombo_ = nullptr;
     HWND autoStartCheck_ = nullptr;
     HWND okBtn_ = nullptr;
     HWND cancelBtn_ = nullptr;
@@ -49,5 +54,7 @@ private:
 
     // Paralelo a los items del combo: indice 0 = predeterminado (id = "").
     std::vector<std::wstring> deviceIds_;
+    // Paralelo a los items del combo de idioma: "" / "es" / "en".
+    std::vector<std::wstring> languageCodes_;
     std::function<void(const std::wstring&)> onApply_;
 };

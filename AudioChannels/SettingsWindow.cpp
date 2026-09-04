@@ -4,16 +4,17 @@
 namespace {
 constexpr wchar_t kClassName[] = L"AudioChannelsSettingsWnd";
 constexpr int IDC_DEVICE_COMBO = 101;
-constexpr int IDC_AUTOSTART_CHECK = 102;
-constexpr int IDC_OK = 103;
-constexpr int IDC_CANCEL = 104;
+constexpr int IDC_LANGUAGE_COMBO = 102;
+constexpr int IDC_AUTOSTART_CHECK = 103;
+constexpr int IDC_OK = 104;
+constexpr int IDC_CANCEL = 105;
 
 // Medidas logicas en pixeles a 96 DPI (100%); Layout() las escala al DPI
 // real de la ventana con Scale().
 constexpr int kLogicalWidth = 380;
-constexpr int kLogicalHeight = 190;
+constexpr int kLogicalHeight = 250;
 constexpr int kMinLogicalWidth = 300;
-constexpr int kMinLogicalHeight = 170;
+constexpr int kMinLogicalHeight = 220;
 constexpr int kMargin = 16;
 constexpr int kLabelHeight = 18;
 constexpr int kLabelGap = 4;
@@ -49,7 +50,7 @@ SettingsWindow::SettingsWindow(HINSTANCE hInstance, HWND owner, DeviceManager& d
     DWORD style = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX;
     DWORD exStyle = WS_EX_DLGMODALFRAME;
 
-    hwnd_ = CreateWindowExW(exStyle, kClassName, L"Configuracion de AudioChannels",
+    hwnd_ = CreateWindowExW(exStyle, kClassName, L"",
         style, CW_USEDEFAULT, CW_USEDEFAULT, kLogicalWidth, kLogicalHeight,
         owner_, nullptr, hInstance_, this);
 
@@ -92,26 +93,33 @@ void SettingsWindow::RecreateFont() {
 }
 
 void SettingsWindow::CreateControls(HWND hwnd) {
-    deviceLabel_ = CreateWindowExW(0, L"STATIC", L"Dispositivo de salida a monitorear:",
+    deviceLabel_ = CreateWindowExW(0, L"STATIC", L"",
         WS_CHILD | WS_VISIBLE, 0, 0, 10, 10, hwnd, nullptr, hInstance_, nullptr);
 
     deviceCombo_ = CreateWindowExW(0, L"COMBOBOX", L"",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | static_cast<DWORD>(CBS_DROPDOWNLIST) | WS_VSCROLL,
         0, 0, 10, 10, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_DEVICE_COMBO)), hInstance_, nullptr);
 
-    autoStartCheck_ = CreateWindowExW(0, L"BUTTON", L"Iniciar automaticamente con Windows",
+    languageLabel_ = CreateWindowExW(0, L"STATIC", L"",
+        WS_CHILD | WS_VISIBLE, 0, 0, 10, 10, hwnd, nullptr, hInstance_, nullptr);
+
+    languageCombo_ = CreateWindowExW(0, L"COMBOBOX", L"",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | static_cast<DWORD>(CBS_DROPDOWNLIST) | WS_VSCROLL,
+        0, 0, 10, 10, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_LANGUAGE_COMBO)), hInstance_, nullptr);
+
+    autoStartCheck_ = CreateWindowExW(0, L"BUTTON", L"",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | static_cast<DWORD>(BS_AUTOCHECKBOX),
         0, 0, 10, 10, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_AUTOSTART_CHECK)), hInstance_, nullptr);
 
-    okBtn_ = CreateWindowExW(0, L"BUTTON", L"Guardar",
+    okBtn_ = CreateWindowExW(0, L"BUTTON", L"",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | static_cast<DWORD>(BS_DEFPUSHBUTTON),
         0, 0, 10, 10, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_OK)), hInstance_, nullptr);
 
-    cancelBtn_ = CreateWindowExW(0, L"BUTTON", L"Cancelar",
+    cancelBtn_ = CreateWindowExW(0, L"BUTTON", L"",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP,
         0, 0, 10, 10, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_CANCEL)), hInstance_, nullptr);
 
-    for (HWND ctrl : { deviceLabel_, deviceCombo_, autoStartCheck_, okBtn_, cancelBtn_ }) {
+    for (HWND ctrl : { deviceLabel_, deviceCombo_, languageLabel_, languageCombo_, autoStartCheck_, okBtn_, cancelBtn_ }) {
         SendMessageW(ctrl, WM_SETFONT, reinterpret_cast<WPARAM>(font_), TRUE);
     }
 }
@@ -130,6 +138,7 @@ void SettingsWindow::Layout() {
     int comboClosedH = Scale(kComboClosedHeight, dpi_);
     int comboDropH = Scale(kComboDropHeight, dpi_);
     int checkH = Scale(kCheckHeight, dpi_);
+    int rowGap = Scale(kRowGap, dpi_);
     int buttonW = Scale(kButtonWidth, dpi_);
     int buttonH = Scale(kButtonHeight, dpi_);
     int buttonGap = Scale(kButtonGap, dpi_);
@@ -143,7 +152,13 @@ void SettingsWindow::Layout() {
     // El "height" de un combo CBS_DROPDOWNLIST fija el limite del
     // desplegable abierto; el tamano de la caja cerrada lo da la fuente.
     MoveWindow(deviceCombo_, margin, y, contentWidth, comboDropH, TRUE);
-    y += comboClosedH + Scale(kRowGap, dpi_);
+    y += comboClosedH + rowGap;
+
+    MoveWindow(languageLabel_, margin, y, contentWidth, labelH, TRUE);
+    y += labelH + labelGap;
+
+    MoveWindow(languageCombo_, margin, y, contentWidth, comboDropH, TRUE);
+    y += comboClosedH + rowGap;
 
     MoveWindow(autoStartCheck_, margin, y, contentWidth, checkH, TRUE);
 
@@ -154,11 +169,20 @@ void SettingsWindow::Layout() {
     MoveWindow(cancelBtn_, cancelX, buttonY, buttonW, buttonH, TRUE);
 }
 
+void SettingsWindow::ApplyLocalizedText() {
+    SetWindowTextW(hwnd_, Loc::T(Loc::Str::SettingsWindowTitle));
+    SetWindowTextW(deviceLabel_, Loc::T(Loc::Str::SettingsDeviceLabel));
+    SetWindowTextW(languageLabel_, Loc::T(Loc::Str::SettingsLanguageLabel));
+    SetWindowTextW(autoStartCheck_, Loc::T(Loc::Str::SettingsAutoStartLabel));
+    SetWindowTextW(okBtn_, Loc::T(Loc::Str::SettingsSaveButton));
+    SetWindowTextW(cancelBtn_, Loc::T(Loc::Str::SettingsCancelButton));
+}
+
 void SettingsWindow::PopulateDeviceList() {
     SendMessageW(deviceCombo_, CB_RESETCONTENT, 0, 0);
     deviceIds_.clear();
 
-    SendMessageW(deviceCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Predeterminado (el del sistema)"));
+    SendMessageW(deviceCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc::T(Loc::Str::SettingsDeviceDefault)));
     deviceIds_.push_back(L"");
 
     for (const auto& dev : deviceManager_.EnumerateRenderDevices()) {
@@ -180,8 +204,32 @@ void SettingsWindow::PopulateDeviceList() {
         AppSettings::IsAutoStartEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
 }
 
+void SettingsWindow::PopulateLanguageList() {
+    SendMessageW(languageCombo_, CB_RESETCONTENT, 0, 0);
+    languageCodes_.clear();
+
+    SendMessageW(languageCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc::T(Loc::Str::SettingsLanguageAuto)));
+    languageCodes_.push_back(L"");
+    SendMessageW(languageCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc::T(Loc::Str::SettingsLanguageSpanish)));
+    languageCodes_.push_back(L"es");
+    SendMessageW(languageCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc::T(Loc::Str::SettingsLanguageEnglish)));
+    languageCodes_.push_back(L"en");
+
+    std::wstring current = AppSettings::GetLanguageOverride();
+    int selectIndex = 0;
+    for (size_t i = 0; i < languageCodes_.size(); ++i) {
+        if (languageCodes_[i] == current) {
+            selectIndex = static_cast<int>(i);
+            break;
+        }
+    }
+    SendMessageW(languageCombo_, CB_SETCURSEL, static_cast<WPARAM>(selectIndex), 0);
+}
+
 void SettingsWindow::Show() {
+    ApplyLocalizedText();
     PopulateDeviceList();
+    PopulateLanguageList();
 
     RECT winRect{};
     GetWindowRect(hwnd_, &winRect);
@@ -199,12 +247,20 @@ void SettingsWindow::Show() {
 }
 
 void SettingsWindow::OnOk() {
-    int index = static_cast<int>(SendMessageW(deviceCombo_, CB_GETCURSEL, 0, 0));
-    std::wstring deviceId = (index >= 0 && index < static_cast<int>(deviceIds_.size()))
-        ? deviceIds_[index]
+    int deviceIndex = static_cast<int>(SendMessageW(deviceCombo_, CB_GETCURSEL, 0, 0));
+    std::wstring deviceId = (deviceIndex >= 0 && deviceIndex < static_cast<int>(deviceIds_.size()))
+        ? deviceIds_[deviceIndex]
         : L"";
-
     AppSettings::SetSelectedDeviceId(deviceId);
+
+    int languageIndex = static_cast<int>(SendMessageW(languageCombo_, CB_GETCURSEL, 0, 0));
+    std::wstring languageCode = (languageIndex >= 0 && languageIndex < static_cast<int>(languageCodes_.size()))
+        ? languageCodes_[languageIndex]
+        : L"";
+    AppSettings::SetLanguageOverride(languageCode);
+    Loc::SetLanguage(languageCode == L"en" ? Loc::Language::English
+        : languageCode == L"es" ? Loc::Language::Spanish
+        : Loc::DetectSystemLanguage());
 
     bool autoStart = SendMessageW(autoStartCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
     AppSettings::SetAutoStartEnabled(autoStart);
@@ -252,7 +308,7 @@ LRESULT SettingsWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
     case WM_DPICHANGED: {
         dpi_ = HIWORD(wParam);
         RecreateFont();
-        for (HWND ctrl : { deviceLabel_, deviceCombo_, autoStartCheck_, okBtn_, cancelBtn_ }) {
+        for (HWND ctrl : { deviceLabel_, deviceCombo_, languageLabel_, languageCombo_, autoStartCheck_, okBtn_, cancelBtn_ }) {
             if (ctrl) SendMessageW(ctrl, WM_SETFONT, reinterpret_cast<WPARAM>(font_), TRUE);
         }
         auto* suggested = reinterpret_cast<RECT*>(lParam);

@@ -5,6 +5,7 @@
 #include "DetailWindow.h"
 #include "SettingsWindow.h"
 #include "AppSettings.h"
+#include "Localization.h"
 
 namespace {
 
@@ -43,9 +44,9 @@ void ShowTrayMenu(HWND hwnd) {
     POINT pt;
     GetCursorPos(&pt);
     HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING, ID_MENU_SETTINGS, L"Configuracion...");
+    AppendMenuW(menu, MF_STRING, ID_MENU_SETTINGS, Loc::T(Loc::Str::TrayMenuSettings));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, ID_MENU_EXIT, L"Salir");
+    AppendMenuW(menu, MF_STRING, ID_MENU_EXIT, Loc::T(Loc::Str::TrayMenuExit));
     SetForegroundWindow(hwnd); // requerido para que el menu se cierre al perder foco
     TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
     DestroyMenu(menu);
@@ -84,10 +85,11 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    Loc::Init();
 
     HANDLE singleInstanceMutex = CreateMutexW(nullptr, TRUE, kSingleInstanceMutexName);
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        MessageBoxW(nullptr, L"AudioChannels ya se esta ejecutando.", L"AudioChannels", MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(nullptr, Loc::T(Loc::Str::AlreadyRunningMessage), Loc::T(Loc::Str::AlreadyRunningTitle), MB_OK | MB_ICONINFORMATION);
         if (singleInstanceMutex) CloseHandle(singleInstanceMutex);
         return 0;
     }

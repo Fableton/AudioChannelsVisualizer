@@ -5,6 +5,7 @@ namespace {
 
 constexpr wchar_t kSettingsKeyPath[] = L"Software\\Fableton\\AudioChannels";
 constexpr wchar_t kDeviceIdValueName[] = L"SelectedDeviceId";
+constexpr wchar_t kLanguageValueName[] = L"Language";
 
 constexpr wchar_t kRunKeyPath[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 constexpr wchar_t kRunValueName[] = L"AudioChannels";
@@ -15,9 +16,7 @@ std::wstring GetExecutablePath() {
     return std::wstring(path, len);
 }
 
-} // namespace
-
-std::wstring GetSelectedDeviceId() {
+std::wstring ReadStringValue(const wchar_t* valueName) {
     HKEY key;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kSettingsKeyPath, 0, KEY_READ, &key) != ERROR_SUCCESS) {
         return L"";
@@ -26,22 +25,40 @@ std::wstring GetSelectedDeviceId() {
     wchar_t buffer[512]{};
     DWORD size = sizeof(buffer);
     DWORD type = 0;
-    LONG result = RegQueryValueExW(key, kDeviceIdValueName, nullptr, &type, reinterpret_cast<BYTE*>(buffer), &size);
+    LONG result = RegQueryValueExW(key, valueName, nullptr, &type, reinterpret_cast<BYTE*>(buffer), &size);
     RegCloseKey(key);
 
     if (result != ERROR_SUCCESS || type != REG_SZ) return L"";
     return std::wstring(buffer);
 }
 
-void SetSelectedDeviceId(const std::wstring& deviceId) {
+void WriteStringValue(const wchar_t* valueName, const std::wstring& value) {
     HKEY key;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, kSettingsKeyPath, 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
         return;
     }
-    RegSetValueExW(key, kDeviceIdValueName, 0, REG_SZ,
-        reinterpret_cast<const BYTE*>(deviceId.c_str()),
-        static_cast<DWORD>((deviceId.size() + 1) * sizeof(wchar_t)));
+    RegSetValueExW(key, valueName, 0, REG_SZ,
+        reinterpret_cast<const BYTE*>(value.c_str()),
+        static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
     RegCloseKey(key);
+}
+
+} // namespace
+
+std::wstring GetSelectedDeviceId() {
+    return ReadStringValue(kDeviceIdValueName);
+}
+
+void SetSelectedDeviceId(const std::wstring& deviceId) {
+    WriteStringValue(kDeviceIdValueName, deviceId);
+}
+
+std::wstring GetLanguageOverride() {
+    return ReadStringValue(kLanguageValueName);
+}
+
+void SetLanguageOverride(const std::wstring& languageCode) {
+    WriteStringValue(kLanguageValueName, languageCode);
 }
 
 bool IsAutoStartEnabled() {

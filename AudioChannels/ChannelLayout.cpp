@@ -1,4 +1,5 @@
 #include "ChannelLayout.h"
+#include "Localization.h"
 
 namespace ChannelLayout {
 namespace {
@@ -69,7 +70,7 @@ std::vector<ChannelDef> FallbackByCount(UINT32 channelCount) {
         for (UINT32 i = 0; i < channelCount; ++i) {
             std::wstring idx = std::to_wstring(i + 1);
             float x = channelCount > 1 ? static_cast<float>(i) / (channelCount - 1) : 0.5f;
-            result.push_back({ L"Canal " + idx, idx, x, 0.5f });
+            result.push_back({ Loc::ChannelFallbackName(static_cast<int>(i + 1)), idx, x, 0.5f });
         }
         return result;
     }
