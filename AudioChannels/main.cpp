@@ -3,6 +3,8 @@
 #include "AudioEngine.h"
 #include "TrayIcon.h"
 #include "DetailWindow.h"
+#include "SettingsWindow.h"
+#include "AppSettings.h"
 
 namespace {
 
@@ -11,11 +13,14 @@ constexpr UINT_PTR kRefreshTimerId = 1;
 constexpr UINT kRefreshIntervalMs = 66; // ~15 Hz, varias actualizaciones por segundo
 constexpr wchar_t kMainClassName[] = L"AudioChannelsMainWnd";
 constexpr wchar_t kSingleInstanceMutexName[] = L"Fableton_AudioChannels_SingleInstance_9F3A2B10";
+constexpr UINT_PTR ID_MENU_SETTINGS = 1;
+constexpr UINT_PTR ID_MENU_EXIT = 2;
 
 std::unique_ptr<DeviceManager> g_deviceManager;
 std::unique_ptr<AudioEngine> g_audioEngine;
 std::unique_ptr<TrayIcon> g_trayIcon;
 std::unique_ptr<DetailWindow> g_detailWindow;
+std::unique_ptr<SettingsWindow> g_settingsWindow;
 
 void RefreshUI() {
     auto channels = g_audioEngine->GetChannels();
@@ -38,7 +43,9 @@ void ShowTrayMenu(HWND hwnd) {
     POINT pt;
     GetCursorPos(&pt);
     HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING, 1, L"Salir");
+    AppendMenuW(menu, MF_STRING, ID_MENU_SETTINGS, L"Configuracion...");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING, ID_MENU_EXIT, L"Salir");
     SetForegroundWindow(hwnd); // requerido para que el menu se cierre al perder foco
     TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
     DestroyMenu(menu);
@@ -54,7 +61,9 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         }
         return 0;
     case WM_COMMAND:
-        if (LOWORD(wParam) == 1) {
+        if (LOWORD(wParam) == ID_MENU_SETTINGS) {
+            if (g_settingsWindow) g_settingsWindow->Show();
+        } else if (LOWORD(wParam) == ID_MENU_EXIT) {
             DestroyWindow(hwnd);
         }
         return 0;
@@ -99,11 +108,21 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int) {
     g_audioEngine = std::make_unique<AudioEngine>();
     g_trayIcon = std::make_unique<TrayIcon>(hwnd, WM_TRAYICON);
     g_detailWindow = std::make_unique<DetailWindow>(hInstance);
+    g_settingsWindow = std::make_unique<SettingsWindow>(hInstance, hwnd, *g_deviceManager);
 
     g_deviceManager->SetOnDefaultDeviceChanged([]() {
-        if (g_audioEngine) g_audioEngine->RestartWithDefaultDevice();
+        if (g_audioEngine && g_audioEngine->IsFollowingDefaultDevice()) {
+            g_audioEngine->RestartCapture();
+        }
     });
 
+    g_settingsWindow->SetOnApply([](const std::wstring& deviceId) {
+        if (g_audioEngine) g_audioEngine->UseDevice(deviceId);
+    });
+
+    // Fija el dispositivo guardado antes de Start(): el hilo de captura lo
+    // toma directo en su primera vuelta, sin un ciclo extra de reconexion.
+    g_audioEngine->UseDevice(AppSettings::GetSelectedDeviceId());
     g_audioEngine->Start();
     g_trayIcon->Show();
     SetTimer(hwnd, kRefreshTimerId, kRefreshIntervalMs, nullptr);
@@ -115,6 +134,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int) {
     }
 
     g_audioEngine->Stop();
+    g_settingsWindow.reset();
     g_detailWindow.reset();
     g_trayIcon.reset();
     g_audioEngine.reset();

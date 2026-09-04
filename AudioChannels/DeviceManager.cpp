@@ -26,6 +26,42 @@ void DeviceManager::SetOnDefaultDeviceChanged(std::function<void()> callback) {
     onDefaultDeviceChanged_ = std::move(callback);
 }
 
+std::vector<AudioDeviceInfo> DeviceManager::EnumerateRenderDevices() const {
+    std::vector<AudioDeviceInfo> result;
+    if (!enumerator_) return result;
+
+    ComPtr<IMMDeviceCollection> collection;
+    if (FAILED(enumerator_->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, collection.ReleaseAndGetAddressOf()))) {
+        return result;
+    }
+
+    UINT count = 0;
+    collection->GetCount(&count);
+    for (UINT i = 0; i < count; ++i) {
+        ComPtr<IMMDevice> device;
+        if (FAILED(collection->Item(i, device.ReleaseAndGetAddressOf()))) continue;
+
+        LPWSTR idStr = nullptr;
+        if (FAILED(device->GetId(&idStr))) continue;
+        std::wstring id = idStr;
+        CoTaskMemFree(idStr);
+
+        std::wstring name = id;
+        ComPtr<IPropertyStore> props;
+        if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, props.ReleaseAndGetAddressOf()))) {
+            PROPVARIANT var;
+            PropVariantInit(&var);
+            if (SUCCEEDED(props->GetValue(PKEY_Device_FriendlyName, &var)) && var.vt == VT_LPWSTR && var.pwszVal) {
+                name = var.pwszVal;
+            }
+            PropVariantClear(&var);
+        }
+
+        result.push_back({ std::move(id), std::move(name) });
+    }
+    return result;
+}
+
 HRESULT DeviceManager::QueryInterface(REFIID riid, void** ppvObject) {
     if (!ppvObject) return E_POINTER;
     if (riid == __uuidof(IUnknown) || riid == __uuidof(IMMNotificationClient)) {

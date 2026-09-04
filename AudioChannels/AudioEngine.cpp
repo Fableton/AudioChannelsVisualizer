@@ -7,6 +7,20 @@ using Microsoft::WRL::ComPtr;
 namespace {
 constexpr float kSilenceFloorDb = -100.0f;
 constexpr REFERENCE_TIME kBufferDuration = 200000; // 20 ms, en unidades de 100 ns
+
+// Piso de silencio digital: por debajo de esto ya no es senal de audio real,
+// es ruido de precision de punto flotante del pipeline (upmixing, dither,
+// efectos APO de Realtek). No es un umbral de volumen perceptual: -85 dB
+// sigue estando muy por debajo de cualquier audio audible, solo descarta
+// el ruido numerico (que suele aparecer entre -150 y -180 dB).
+constexpr float kActiveFloorDb = -85.0f;
+const float kActiveFloorLinear = powf(10.0f, kActiveFloorDb / 20.0f);
+
+// Retencion de apagado: una vez que un canal se detecta activo, se queda
+// prendido este tiempo despues de la ultima senal detectada antes de
+// apagarse. El encendido sigue siendo instantaneo; esto solo evita el
+// parpadeo en canales con senal intermitente (tipico del LFE).
+constexpr auto kActiveHoldDuration = std::chrono::milliseconds(1000);
 }
 
 AudioEngine::AudioEngine() = default;
@@ -32,7 +46,22 @@ void AudioEngine::Stop() {
     if (dataEvent_) { CloseHandle(dataEvent_); dataEvent_ = nullptr; }
 }
 
-void AudioEngine::RestartWithDefaultDevice() {
+void AudioEngine::UseDevice(const std::wstring& deviceId) {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        requestedDeviceId_ = deviceId;
+    }
+    RestartCapture();
+}
+
+bool AudioEngine::IsFollowingDefaultDevice() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return requestedDeviceId_.empty();
+}
+
+void AudioEngine::RestartCapture() {
+    // Si todavia no arranco el hilo (llamada antes de Start()), no hay nada
+    // que reiniciar: InitializeCaptureDevice() ya va a leer el valor nuevo.
     if (running_.load() && restartEvent_) SetEvent(restartEvent_);
 }
 
@@ -50,7 +79,7 @@ void AudioEngine::ThreadProc() {
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
     while (running_.load(std::memory_order_acquire)) {
-        if (!InitializeForDefaultDevice()) {
+        if (!InitializeCaptureDevice()) {
             CleanupDeviceResources();
             HANDLE waits[] = { stopEvent_, restartEvent_ };
             WaitForMultipleObjects(2, waits, FALSE, 1000);
@@ -87,15 +116,23 @@ void AudioEngine::ThreadProc() {
     CoUninitialize();
 }
 
-bool AudioEngine::InitializeForDefaultDevice() {
+bool AudioEngine::InitializeCaptureDevice() {
+    std::wstring targetId;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        targetId = requestedDeviceId_;
+    }
+
     ComPtr<IMMDeviceEnumerator> enumerator;
     HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
         __uuidof(IMMDeviceEnumerator), reinterpret_cast<void**>(enumerator.ReleaseAndGetAddressOf()));
     if (FAILED(hr)) return false;
 
     ComPtr<IMMDevice> device;
-    hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, device.ReleaseAndGetAddressOf());
-    if (FAILED(hr)) return false; // sin dispositivo de salida activo
+    hr = targetId.empty()
+        ? enumerator->GetDefaultAudioEndpoint(eRender, eConsole, device.ReleaseAndGetAddressOf())
+        : enumerator->GetDevice(targetId.c_str(), device.ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return false; // sin dispositivo de salida activo (o el elegido ya no existe)
 
     std::wstring friendlyName;
     ComPtr<IPropertyStore> props;
@@ -156,6 +193,9 @@ bool AudioEngine::InitializeForDefaultDevice() {
             snap.levelDb = kSilenceFloorDb;
             channels_.push_back(std::move(snap));
         }
+        // time_point() (epoca) marca "nunca activo": lastActiveAt_ arranca
+        // muy en el pasado, asi que held da false hasta la primera senal real.
+        lastActiveAt_.assign(channels_.size(), std::chrono::steady_clock::time_point());
     }
     return true;
 }
@@ -208,9 +248,22 @@ void AudioEngine::DrainPackets() {
 
     if (!gotAny) return;
 
+    auto now = std::chrono::steady_clock::now();
+
     std::lock_guard<std::mutex> lock(mutex_);
-    for (size_t c = 0; c < channels_.size() && c < peaks.size(); ++c) {
-        channels_[c].active = peaks[c] > 0.0f;
-        channels_[c].levelDb = peaks[c] > 0.0f ? 20.0f * log10f(peaks[c]) : kSilenceFloorDb;
+    for (size_t c = 0; c < channels_.size() && c < peaks.size() && c < lastActiveAt_.size(); ++c) {
+        bool detectedNow = peaks[c] > kActiveFloorLinear;
+        if (detectedNow) {
+            lastActiveAt_[c] = now;
+            channels_[c].levelDb = 20.0f * log10f(peaks[c]);
+        }
+
+        bool held = (now - lastActiveAt_[c]) < kActiveHoldDuration;
+        channels_[c].active = held;
+        if (!held) {
+            channels_[c].levelDb = kSilenceFloorDb;
+        }
+        // Si held es true pero detectedNow es false, se mantiene active=true
+        // y se conserva el ultimo dB medido (no se pisa levelDb).
     }
 }

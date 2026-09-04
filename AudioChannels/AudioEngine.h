@@ -28,16 +28,22 @@ public:
     void Start();
     void Stop();
 
+    // Cambia el dispositivo a monitorear ("" = predeterminado del sistema)
+    // y fuerza al hilo de captura a reinicializarse con el nuevo. Se puede
+    // llamar antes de Start() para fijar el dispositivo inicial.
+    void UseDevice(const std::wstring& deviceId);
+    bool IsFollowingDefaultDevice() const;
+
     // Se llama cuando el dispositivo de salida predeterminado cambio en
-    // Windows; fuerza al hilo de captura a reinicializarse con el nuevo.
-    void RestartWithDefaultDevice();
+    // Windows; solo tiene efecto si UseDevice() no fijo uno especifico.
+    void RestartCapture();
 
     std::vector<ChannelSnapshot> GetChannels() const;
     std::wstring GetDeviceFriendlyName() const;
 
 private:
     void ThreadProc();
-    bool InitializeForDefaultDevice();
+    bool InitializeCaptureDevice();
     void DrainPackets();
     void CleanupDeviceResources();
 
@@ -54,5 +60,7 @@ private:
 
     mutable std::mutex mutex_;
     std::vector<ChannelSnapshot> channels_;
+    std::vector<std::chrono::steady_clock::time_point> lastActiveAt_; // en paralelo a channels_
     std::wstring deviceFriendlyName_;
+    std::wstring requestedDeviceId_; // "" = seguir el dispositivo predeterminado
 };

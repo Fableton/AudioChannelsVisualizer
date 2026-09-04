@@ -1,10 +1,17 @@
 #pragma once
 #include "framework.h"
 #include <mmdeviceapi.h>
+#include <propsys.h>
+
+struct AudioDeviceInfo {
+    std::wstring id;
+    std::wstring name;
+};
 
 // Escucha los cambios del dispositivo de salida predeterminado de Windows
 // (IMMNotificationClient) y avisa via callback para que el motor de audio
-// se reconfigure solo.
+// se reconfigure solo. Tambien permite enumerar los dispositivos de salida
+// disponibles para la pantalla de configuracion.
 class DeviceManager : public IMMNotificationClient {
 public:
     DeviceManager();
@@ -14,6 +21,7 @@ public:
     DeviceManager& operator=(const DeviceManager&) = delete;
 
     void SetOnDefaultDeviceChanged(std::function<void()> callback);
+    std::vector<AudioDeviceInfo> EnumerateRenderDevices() const;
 
     // IUnknown
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override;

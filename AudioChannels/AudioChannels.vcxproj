@@ -92,6 +92,8 @@
     <ClCompile Include="ChannelLayout.cpp" />
     <ClCompile Include="TrayIcon.cpp" />
     <ClCompile Include="DetailWindow.cpp" />
+    <ClCompile Include="SettingsWindow.cpp" />
+    <ClCompile Include="AppSettings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h" />
@@ -100,6 +102,8 @@
     <ClInclude Include="ChannelLayout.h" />
     <ClInclude Include="TrayIcon.h" />
     <ClInclude Include="DetailWindow.h" />
+    <ClInclude Include="SettingsWindow.h" />
+    <ClInclude Include="AppSettings.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
